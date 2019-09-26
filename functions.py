@@ -80,22 +80,28 @@ def format_journal_responses(values):
 
 def generate_msg(df):
 
-    st_ind = 100
+    st_ind = 25
     text = 'hi\n\n'
     requests = []
     body_end_ind = 1
-    for i in range(3):#len(df)):
+    for i in range(len(df)):
 
         # Create header
         date_text = df['Timestamp'][i]
         date_text = datetime.strptime(date_text, TIMESTAMP_FORMAT)
         date_text = datetime.strftime(date_text, DATE_FORMAT) + '\n'
 
-        header_st_ind = body_end_ind + 1
+        header_st_ind = body_end_ind
         header_end_ind = header_st_ind + len(date_text)
 
         # Create body
-        body_text = df['Journal entry'][i] + '\n\n'
+        body_text = 'Mood:\t\t\t\t{}\n'.format(df['Mood'][i]) + \
+                    'Read scriptures:\t\t{}\n'.format(df['Read scriptures'][i]) + \
+                    'Exercise:\t\t\t{}\n'.format(df['Exercise'][i]) + \
+                    'Study:\t\t\t\t{}\n'.format(df['Study (language, programming, music)'][i]) + \
+                    'Gratitude:\t\t\t{}\n'.format(df['Gratitude'][i]) + \
+                    'New goals and progress:\t{}\n'.format(df['New goals and progress'][i]) + \
+                    '\n{}\n\n\n'.format(df['Journal entry'][i])
 
         body_st_ind = header_end_ind
         body_end_ind = body_st_ind + len(body_text)
@@ -141,38 +147,97 @@ def generate_msg(df):
             }
         )
 
+    return requests
 
 
-def get_start_index(document):
+def get_doc_dates(document):
 
-    a = 1
+    date_inds = list()
+    date_end_inds = list()
+    dates = list()
+
+    for i, elem in enumerate(document['body']['content']):
+
+        if 'paragraph' in elem.keys():
+
+            # Get paragraph text
+            text = elem['paragraph']['elements'][0]['textRun']['content']
+
+            # Strip formatting
+            text = text.strip()
+
+            # Attempt to read date format
+            try:
+                dt = datetime.strptime(text, DATE_FORMAT)
+
+            except ValueError:
+                dt = False
+
+            if dt:
+                dates.append(dt)
+                date_inds.append(i)
+
+    return dates, date_inds
 
 
-def make_journal_document(df):
-    """Shows basic usage of the Docs API.
-    Prints the title of a sample document.
+def get_doc_indicies(dates, date_inds, df_filt):
+
+    doc_inds = 1
+
+    # Get the dates
+
+
+    return doc_inds
+
+
+def filter_dates(dates, df):
+    """
+    Remove journal entries which already appear in the Google document. This is done by comparinng dates; each day is only allowed one entry.
+    Args:
+        dates (list of datetime): a list of datetimes derrived from the Google document.
+        df (pandas dataframe): a Pandas dataframe containing all journal entries.
+
+    Returns:
+
     """
 
-    service = build('docs', 'v1', credentials=creds)
+    # Convert dataframe timestamps from strings to datetime
+    df_dt = [datetime.strptime(i, TIMESTAMP_FORMAT) for i in df['Timestamp']]
 
-    body = {'name': [], 'parents': ["11y0SiVNpROcQKCTVGWs-6xAgTpVLpZEE"]}
+    # Remove hours, minutes, seconds to allow matching with journal entry
+    df_dt = [i.replace(hour=0, minute=0, second=0) for i in df_dt]
+
+    # Find the days which appear in df, but not in dates
+    ind_unique = list()
+    for i, dt in enumerate(df_dt):
+        if dt not in dates:
+            ind_unique.append(i)
+
+    # Filter dataframe
+    df_filt = df.iloc[ind_unique]
+
+    return df_filt
+
+
+def update_journal(df):
+
+    # Set up service
+    service = build('docs', 'v1', credentials=creds)
 
     # Retrieve the documents contents from the Docs service.
     document = service.documents().get(documentId=DOCUMENT_ID).execute()
 
-    st_ind = 10
-    text = 'hi\n\n'
+    # Get list of dates and corresponding indicies which have journal entries
+    dates, date_inds = get_doc_dates(document)
 
-    requests = [
-        {
-            'insertText': {
-                'location': {
-                    'index': st_ind,
-                },
-                'text': text
-            }
-        }
-    ]
+    # Determine which new entries are needed
+    df = filter_dates(dates, df)
+
+    # Find where the new entries should be inserted
+    doc_inds = get_doc_indicies(dates, date_inds, df_filt)
+
+    # Generate message
+    requests = generate_msg(df)
 
     result = service.documents().batchUpdate(documentId=DOCUMENT_ID, body={'requests': requests}).execute()
 

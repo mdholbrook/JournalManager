@@ -3,6 +3,14 @@ matplotlib
 seaborn
 pandas
 ipython
+sphinx
+sphinxcontrib-napoleon
+sphinx_rtd_theme
+pudb
+pytest
+pytest-pep8
+pytest-cov
+pytest-pudb
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
