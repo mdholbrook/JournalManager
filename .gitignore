@@ -4,3 +4,6 @@ Data/*
 .idea/
 *.pickle
 __pycache__
+sphinx/_build
+sphinx/
+*.pyc

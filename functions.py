@@ -151,6 +151,15 @@ def generate_msg(df):
 
 
 def get_doc_dates(document):
+    """
+    Parses out the dates in journal entries and returns the dates and their indices (location) as datetimes.
+    Args:
+        document (document): result of the Google doc api for the journal document
+
+    Returns:
+        dates (list of datetime): dates in the document
+        date_inds (index of date)
+    """
 
     date_inds = list()
     date_end_inds = list()
@@ -180,12 +189,29 @@ def get_doc_dates(document):
     return dates, date_inds
 
 
-def get_doc_indicies(dates, date_inds, df_filt):
+def get_doc_indicies(dates, date_inds, df):
 
-    doc_inds = 1
+    # Get the dates from the form
+    form_dates = [datetime.strptime(i, TIMESTAMP_FORMAT) for i in df['Timestamp']]
 
-    # Get the dates
+    # Concatenate dates
+    dates = form_dates + dates
 
+    # Sort dates
+    inds = np.argsort(dates)
+
+    # Get doc list indices
+    doc_list_inds = [np.argwhere(inds == i)[0][0] for i in range(len(form_dates))]
+
+    # Determine the correct document index
+    doc_inds = []
+    for ind in doc_list_inds:
+
+        if ind >= len(date_inds):
+            doc_inds.append(np.max(date_inds))
+
+        else:
+            doc_inds.append(date_inds[ind])
 
     return doc_inds
 
@@ -234,7 +260,7 @@ def update_journal(df):
     df = filter_dates(dates, df)
 
     # Find where the new entries should be inserted
-    doc_inds = get_doc_indicies(dates, date_inds, df_filt)
+    doc_inds = get_doc_indicies(dates, date_inds, df)
 
     # Generate message
     requests = generate_msg(df)
