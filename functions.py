@@ -36,7 +36,7 @@ if not creds or not creds.valid:
     if creds and creds.expired and creds.refresh_token:
         creds.refresh(Request())
     else:
-        flow = InstalledAppFlow.from_client_secrets_file('Data\credentials.json', SCOPES)
+        flow = InstalledAppFlow.from_client_secrets_file('Data/credentials.json', SCOPES)
         creds = flow.run_local_server(port=0)
 
     # Save the credentials for the next run
@@ -80,7 +80,7 @@ def format_journal_responses(values):
 
 def generate_msg(df, doc_inds):
 
-    st_ind = 25
+    st_ind = 1
     text = 'hi\n\n'
     requests = []
     body_end_ind = 1
@@ -91,8 +91,8 @@ def generate_msg(df, doc_inds):
         date_text = datetime.strptime(date_text, TIMESTAMP_FORMAT)
         date_text = datetime.strftime(date_text, DATE_FORMAT) + '\n'
 
-        header_st_ind = doc_inds[i]
-        header_end_ind = header_st_ind + len(date_text)
+        header_st_ind = int(doc_inds[i] + body_end_ind)
+        header_end_ind = int(header_st_ind + len(date_text))
 
         # Create body
         body_text = 'Mood:\t\t\t\t{}\n'.format(df['Mood'][i]) + \
@@ -103,8 +103,8 @@ def generate_msg(df, doc_inds):
                     'New goals and progress:\t{}\n'.format(df['New goals and progress'][i]) + \
                     '\n{}\n\n\n'.format(df['Journal entry'][i])
 
-        body_st_ind = header_end_ind
-        body_end_ind = body_st_ind + len(body_text)
+        body_st_ind = int(header_end_ind)
+        body_end_ind = int(body_st_ind + len(body_text))
 
         requests.append(
             {  # Header
@@ -129,10 +129,10 @@ def generate_msg(df, doc_inds):
                 'updateParagraphStyle': {
                     'range': {
                         'startIndex': header_st_ind,
-                        'endIndex': header_end_ind
+                        'endIndex': body_end_ind
                     },
                     'paragraphStyle': {
-                        'namedStyleType': 'HEADING_1',
+                        'namedStyleType': 'NORMAL_TEXT',
                         'spaceAbove': {
                             'magnitude': 10.0,
                             'unit': 'PT'
@@ -206,7 +206,9 @@ def get_doc_indices(dates, date_inds, df):
     doc_inds = []
     for ind in doc_list_inds:
 
-        if ind >= len(date_inds):
+        if len(date_inds) == 0:
+            doc_inds.append(0)
+        elif ind >= len(date_inds):
             doc_inds.append(np.max(date_inds))
 
         else:
@@ -241,6 +243,9 @@ def filter_dates(dates, df):
     # Filter dataframe
     df_filt = df.iloc[ind_unique]
 
+    # Reset indices
+    df_filt = df_filt.reset_index()
+
     return df_filt
 
 
@@ -267,5 +272,3 @@ def update_journal(df):
     result = service.documents().batchUpdate(documentId=DOCUMENT_ID, body={'requests': requests}).execute()
 
     print('The title of the document is: {}'.format(document.get('title')))
-
-
