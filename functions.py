@@ -78,7 +78,7 @@ def format_journal_responses(values):
     return pd.DataFrame.from_dict(df)
 
 
-def generate_msg(df):
+def generate_msg(df, doc_inds):
 
     st_ind = 25
     text = 'hi\n\n'
@@ -91,7 +91,7 @@ def generate_msg(df):
         date_text = datetime.strptime(date_text, TIMESTAMP_FORMAT)
         date_text = datetime.strftime(date_text, DATE_FORMAT) + '\n'
 
-        header_st_ind = body_end_ind
+        header_st_ind = doc_inds[i]
         header_end_ind = header_st_ind + len(date_text)
 
         # Create body
@@ -162,7 +162,6 @@ def get_doc_dates(document):
     """
 
     date_inds = list()
-    date_end_inds = list()
     dates = list()
 
     for i, elem in enumerate(document['body']['content']):
@@ -189,7 +188,7 @@ def get_doc_dates(document):
     return dates, date_inds
 
 
-def get_doc_indicies(dates, date_inds, df):
+def get_doc_indices(dates, date_inds, df):
 
     # Get the dates from the form
     form_dates = [datetime.strptime(i, TIMESTAMP_FORMAT) for i in df['Timestamp']]
@@ -260,10 +259,10 @@ def update_journal(df):
     df = filter_dates(dates, df)
 
     # Find where the new entries should be inserted
-    doc_inds = get_doc_indicies(dates, date_inds, df)
+    doc_inds = get_doc_indices(dates, date_inds, df)
 
     # Generate message
-    requests = generate_msg(df)
+    requests = generate_msg(df, doc_inds)
 
     result = service.documents().batchUpdate(documentId=DOCUMENT_ID, body={'requests': requests}).execute()
 

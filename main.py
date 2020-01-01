@@ -1,4 +1,4 @@
-from functions import read_journal_responses
+from functions import read_journal_responses, update_journal
 
 
 def main():
@@ -6,6 +6,7 @@ def main():
     df = read_journal_responses()
 
     # Post to Google doc
+    update_journal(df)
 
     return
 
