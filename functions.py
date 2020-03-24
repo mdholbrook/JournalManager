@@ -13,7 +13,7 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly',
 
 # The ID and range of the spreadsheet.
 JOURNAL_SPREADSHEET_ID = '1g6C9nSwY_3I-ADzEUl87AKKyx3EKndM5PB2AzSXSvs4'
-SAMPLE_RANGE_NAME = 'Form Responses 1!A1:H'
+SAMPLE_RANGE_NAME = 'Form Responses 1!A1:J'
 
 # Document and folder IDs
 DOCUMENT_ID = '1-caO4bDTP-VH8CUdOH-JteR4fSRtqw6VArsDLjqf4Ow'
@@ -21,6 +21,7 @@ PARENT_FOLDER = '1B296OchXs5cA5fflhyzkopiggd9hQavB'
 
 DATE_FORMAT = '%A, %B %d, %Y'
 TIMESTAMP_FORMAT = '%m/%d/%Y %H:%M:%S'
+GOOGLE_TIME_FORMAT = '%m/%d/%Y'
 
 creds = None
 # The file token.pickle stores the user's access and refresh tokens, and is
@@ -73,7 +74,28 @@ def format_journal_responses(values):
 
         for i, key in enumerate(col_names):
 
-            df[key].append(entry[i])
+            if len(entry) > i:
+                df[key].append(entry[i])
+            else:
+                df[key].append('')
+
+    # Convert to pandas dataframe
+    df = pd.DataFrame.from_dict(df)
+
+    # Find dates to replace
+    inds = df['Date (blank if today)'] != ''
+    inds = inds[inds].index
+
+    # Replace dates
+    for i in inds:
+        tstmp = datetime.strptime(df['Timestamp'][i], TIMESTAMP_FORMAT)
+        overstmp = datetime.strptime(df['Date (blank if today)'][i], GOOGLE_TIME_FORMAT)
+
+        # Change date
+        tstmp = tstmp.replace(year=overstmp.year, month=overstmp.month, day=overstmp.day)
+
+        # Replace timestamp
+        df.loc[i, 'Timestamp'] = datetime.strftime(tstmp, TIMESTAMP_FORMAT)
 
     return pd.DataFrame.from_dict(df)
 
@@ -249,6 +271,41 @@ def filter_dates(dates, df):
     return df_filt
 
 
+def clear_document(service, document, doc_ID):
+    """
+    Deletes all journal entries so a new document can be created
+    Args:
+        service:
+        document:
+        doc_ID:
+
+    Returns:
+
+    """
+    start_ind = 1
+    end_ind = document['body']['content'][-1]['endIndex']
+
+    # Only process if the document is not empty
+    if end_ind > 2:
+        requests = [
+            {
+                'deleteContentRange': {
+                    'range': {
+                        'startIndex': start_ind,
+                        'endIndex': end_ind-1,
+                    }
+                }
+            }
+        ]
+
+        service.documents().batchUpdate(documentId=doc_ID, body={'requests': requests}).execute()
+
+        # Retrieve the documents contents from the Docs service.
+        document = service.documents().get(documentId=DOCUMENT_ID).execute()
+
+    return document
+
+
 def update_journal(df):
 
     # Set up service
@@ -256,6 +313,9 @@ def update_journal(df):
 
     # Retrieve the documents contents from the Docs service.
     document = service.documents().get(documentId=DOCUMENT_ID).execute()
+
+    # Cleat the doucment
+    document = clear_document(service, document, DOCUMENT_ID)
 
     # Get list of dates and corresponding indicies which have journal entries
     dates, date_inds = get_doc_dates(document)
